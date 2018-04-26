@@ -53,6 +53,7 @@ def senddata(temp,hum):
     data['Humidity']=hum
     data['ReadTime']=datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
     tablesvc.insert_or_replace_entity(temptable, data)
+    print(data)
 
 
 while True:
