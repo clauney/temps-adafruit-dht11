@@ -1,35 +1,63 @@
-import Adafruit_DHT
-import azure
+#import azure
 import time
 
+#%%
+import sys
+#import os
+import datetime
+#import json
+#import random
+#import time
+###############################################################################
+cloudenv='tempalarm'
+sys.path.append("..")
+import shinythingscreds
+credsdict=shinythingscreds.init(cloudenv)
+sntableacctname=credsdict['tempalarmtablestorageaccountname']
+sntableacctkey=credsdict['tempalarmtablestorageaccountkey']
+
+temptable=credsdict['temptable']
+
+###############################################################################
+devstubs=True   #if not actually running on a pi
+
+###############################################################################
+from azure.cosmosdb.table.tableservice import TableService
+tablesvc = TableService(account_name=sntableacctname, account_key=sntableacctkey)
+###############################################################################
 
 # Info on my specific sensors
-DHT_TYPE = Adafruit_DHT.DHT11
-DHT_PIN  = 4
+if not devstubs:
+    import Adafruit_DHT
+    DHT_TYPE = Adafruit_DHT.DHT11
+    DHT_PIN  = 4
 
-def getdata(DHT_TYPE, DHT_PIN):
+def getsensordata(DHT_TYPE, DHT_PIN):
         #while True:
-        humidity, temp = Adafruit_DHT.read(DHT_TYPE, DHT_PIN)
-                #sometimes it sucks, particularly during high load. if at first you do not succeed...
-                #if humidity == None or temp == None:
-                        #time.sleep(5)
-                        #continue
+        if devstubs:
+            return (20,50)
+        else:
+            humidity, temp = Adafruit_DHT.read(DHT_TYPE, DHT_PIN)
+            #sometimes it sucks, particularly during high load. if at first you do not succeed...
+            while humidity == None or temp == None:
+                time.sleep(.5)
+                humidity, temp = Adafruit_DHT.read(DHT_TYPE, DHT_PIN)
         return (temp, humidity)
 
 def convceltofar(tempcel):
         return (tempcel*1.8)+32
 
+def senddata(temp,hum):
+    data={'PartitionKey': 'SBUX-LAB','RowKey': '123456789'}
+    data['TempF']=temp
+    data['Humidity']=hum
+    data['ReadTime']=datetime.datetime.now(datetime.timezone.utc).isoformat().replace('+00:00', 'Z')
+    tablesvc.insert_or_replace_entity(temptable, data)
+
+
 while True:
-        print("getting data")
-        (tempreading, humidityreading)=getdata(11,4)
-        print("temperature is:",tempreading)
-        print("humidity is:",humidityreading)
-        if humidityreading == None or tempreading == None:
-                print ("since temp and humidity were blank, will sleep and try again")
-                time.sleep(2)
-                continue
-        else:
-                print("this would be me uploading to the azures")
-                print("temperature to upload:",convceltofar(tempreading))
-                print("humidity to upload:",humidityreading)
+    print("getting data")
+    (temp, hum)=getsensordata(11,4)
+    senddata(convceltofar(temp),hum)
+    time.sleep (1)
                 
